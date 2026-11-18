@@ -55,7 +55,8 @@ export default async function handler(req, res) {
       preset,
       durationMs,
       createdAt: now,
-      expiresAt: durationMs ? now + durationMs : null,
+      activatedAt: null,
+      expiresAt: null, // Inicia automaticamente na primeira pessoa que logar
       hwid: null,
       lastIp: null,
       lastDevice: null,
@@ -78,19 +79,19 @@ export default async function handler(req, res) {
   }
 
   if (action === "restart_key") {
-    const now = Date.now();
     db[key].hwid = null;
-    db[key].expiresAt = db[key].durationMs ? now + db[key].durationMs : null;
+    db[key].activatedAt = null;
+    db[key].expiresAt = null; // Reinicia automaticamente no proximo 1o login
     await redis.set(STORE_KEY, db);
     return res.status(200).json({ ok: true });
   }
 
   if (action === "change_duration") {
     const durationMs = computeDurationMs(preset, customAmount, customUnit);
-    const now = Date.now();
     db[key].preset = preset;
     db[key].durationMs = durationMs;
-    db[key].expiresAt = durationMs ? now + durationMs : null;
+    // Se ja estiver vinculada a alguem, atualiza a partir de agora; se nao, aguarda o 1o login
+    db[key].expiresAt = (db[key].hwid && durationMs) ? Date.now() + durationMs : null;
     await redis.set(STORE_KEY, db);
     return res.status(200).json({ ok: true });
   }
