@@ -21,7 +21,6 @@
     * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
     body { margin: 0; background: var(--bg); color: var(--text); min-height: 100vh; }
 
-    /* Login Gate */
     #loginGate {
       display: flex; align-items: center; justify-content: center;
       min-height: 100vh; padding: 20px;
@@ -50,7 +49,6 @@
     .btn-primary { background: var(--accent); color: #fff; width: 100%; margin-top: 12px; }
     .btn-primary:hover { filter: brightness(1.1); }
 
-    /* Dashboard */
     #dashboard { display: none; max-width: 1280px; margin: 0 auto; padding: 24px; }
     .topbar {
       display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
@@ -86,6 +84,7 @@
     }
     .tag { padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; display: inline-block; }
     .tag-ok { background: rgba(40,205,110,0.15); color: var(--green); }
+    .tag-wait { background: rgba(0,168,255,0.15); color: var(--accent); }
     .tag-warn { background: rgba(255,185,45,0.15); color: var(--warn); }
     .tag-exp { background: rgba(240,70,85,0.15); color: var(--danger); }
     .actions { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -104,7 +103,6 @@
 </head>
 <body>
 
-  <!-- TELA DE LOGIN -->
   <div id="loginGate">
     <div class="login-box">
       <span class="badge">BZ7 GROUP</span>
@@ -116,7 +114,6 @@
     </div>
   </div>
 
-  <!-- DASHBOARD PRINCIPAL -->
   <div id="dashboard">
     <div class="topbar">
       <div>
@@ -131,13 +128,13 @@
 
     <div class="stats">
       <div class="stat-card"><span>Total de Keys</span><strong id="stTotal">0</strong></div>
-      <div class="stat-card"><span>Keys Ativas</span><strong id="stActive" style="color:var(--green);">0</strong></div>
+      <div class="stat-card"><span>Keys Ativas / Livres</span><strong id="stActive" style="color:var(--green);">0</strong></div>
       <div class="stat-card"><span>HWIDs Travados</span><strong id="stHwid">0</strong></div>
       <div class="stat-card"><span>Expiradas</span><strong id="stExpired" style="color:var(--danger);">0</strong></div>
     </div>
 
     <div class="creator">
-      <div style="font-weight:800;font-size:13px;margin-bottom:14px;color:var(--accent);">GERAR NOVA KEY</div>
+      <div style="font-weight:800;font-size:13px;margin-bottom:14px;color:var(--accent);">GERAR NOVA KEY (ATIVA AUTOMATICAMENTE NO 1º LOGIN)</div>
       <div class="creator-grid">
         <div>
           <label>DESCRICAO / DONO DA KEY</label>
@@ -267,7 +264,7 @@
 
     async function restartKey(key) {
       await apiCall({ action: "restart_key", key });
-      toast("Key reiniciada (HWID limpo + tempo renovado)!");
+      toast("Key reiniciada! Vai ativar no proximo 1o login.");
       loadKeys();
     }
 
@@ -297,9 +294,21 @@
       loadKeys();
     }
 
-    function formatRemaining(expiresAt) {
-      if (!expiresAt) return `<span class="tag tag-ok">VITALICIO (PERM)</span>`;
-      const diff = expiresAt - Date.now();
+    function formatDurationLabel(ms) {
+      if (!ms) return "Vitalicio";
+      const mins = Math.round(ms / 60000);
+      if (mins < 60) return mins + " min";
+      const hrs = Math.round(mins / 60);
+      if (hrs < 24) return hrs + "h";
+      return Math.round(hrs / 24) + "d";
+    }
+
+    function formatStatus(k) {
+      if (!k.durationMs) return `<span class="tag tag-ok">VITALICIO (PERM)</span>`;
+      if (!k.expiresAt) {
+        return `<span class="tag tag-wait">AGUARDANDO 1º LOGIN (${formatDurationLabel(k.durationMs)})</span>`;
+      }
+      const diff = k.expiresAt - Date.now();
       if (diff <= 0) return `<span class="tag tag-exp">EXPIRADA</span>`;
       const mins = Math.floor(diff / 60000);
       const hrs = Math.floor(mins / 60);
@@ -329,8 +338,8 @@
         <tr>
           <td><span class="key-pill" onclick="navigator.clipboard?.writeText('${k.key}');toast('Key copiada!')">${k.key}</span></td>
           <td><strong>${k.description || "Sem descricao"}</strong></td>
-          <td>${formatRemaining(k.expiresAt)}</td>
-          <td class="mono">${k.hwid ? k.hwid.slice(0, 22) + "..." : '<span style="color:var(--sub)">Livre (1o login trava)</span>'}</td>
+          <td>${formatStatus(k)}</td>
+          <td class="mono">${k.hwid ? k.hwid.slice(0, 22) + "..." : '<span style="color:var(--sub)">Livre (1º login trava)</span>'}</td>
           <td>
             <div class="mono">IP: <strong>${k.lastIp || "-"}</strong></div>
             <div style="color:var(--sub);font-size:11px;">${k.lastDevice || "-"} • ${k.lastUser || "Nunca logou"}</div>
